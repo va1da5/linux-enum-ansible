@@ -1,0 +1,47 @@
+---
+- name: Creates hashes directory
+  delegate_to: localhost
+  become: false
+  file:
+    path: "reports/{{inventory_hostname}}/hashes"
+    state: directory
+
+- name: Calculate hashes with grep
+  shell: find {{item}} type f -exec sha256sum {} \; 2> /dev/null | grep -Ei '{{ grep }}' | sort
+  register: output
+  with_items:
+    - "{{ dirs }}"
+  when: grep | length > 0
+
+# - ansible.builtin.debug:
+#     var: output
+#   when: grep | length > 0
+
+- name: Save hashes
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ item.1.stdout }}"
+    dest: "reports/{{inventory_hostname}}/hashes/{{dirs[item.0]|replace('/','-')}}.{{ ansible_date_time.iso8601 }}.txt"
+  with_indexed_items:
+    - "{{ output.results }}"
+  when: not output.skipped
+
+# --------------------------------
+
+- name: Calculate hashes
+  shell: find {{item}} type f -exec sha256sum {} \; 2> /dev/null | sort
+  register: output
+  with_items:
+    - "{{ dirs }}"
+  when: grep | length < 1
+
+- name: Save hashes
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ item.1.stdout }}"
+    dest: "reports/{{inventory_hostname}}/hashes/{{dirs[item.0]|replace('/','-')}}.{{ ansible_date_time.iso8601 }}.txt"
+  with_indexed_items:
+    - "{{ output.results }}"
+  when: not output.skipped

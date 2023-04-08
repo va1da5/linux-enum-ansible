@@ -1,0 +1,20 @@
+{
+  "files.exclude": {
+    "**/.venv": true
+  },
+  "editor.tabSize": 4,
+  "python.formatting.provider": "black",
+  "python.linting.flake8Enabled": false,
+  "python.linting.mypyEnabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.enabled": true,
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
+  },
+  "ansible.ansible.path": ".venv/bin/ansible",
+  "ansible.python.interpreterPath": ".venv/bin/python",
+  "ansible.ansibleNavigator.path": ".venv/bin/ansible-navigator",
+  "ansible.validation.lint.path": ".venv/bin/ansible-lint",
+}

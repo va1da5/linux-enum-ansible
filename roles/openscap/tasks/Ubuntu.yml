@@ -1,0 +1,78 @@
+---
+# https://www.open-scap.org/download/
+- name: Install openSCAP dependencies
+  ansible.builtin.package:
+    name:
+      - libopenscap8
+      - ssg-base
+      - ssg-debderived
+      - ssg-debian
+      - ssg-nondebian
+      - ssg-applications
+      - bzip2
+    update_cache: true
+
+- name: Ubuntu version
+  ansible.builtin.shell: lsb_release -cs
+  register: ubuntu_version
+
+# https://ubuntu.com/security/oval
+- name: Download Ubuntu OVAL
+  vars:
+    version: "{{ubuntu_version.stdout}}"
+  ansible.builtin.get_url:
+    url: https://security-metadata.canonical.com/oval/com.ubuntu.{{version}}.usn.oval.xml.bz2
+    dest: /tmp/ubuntu.oval.xml.bz2
+    mode: "0660"
+
+- name: bzip2 unarchive
+  ansible.builtin.shell: bzip2 --decompress /tmp/ubuntu.oval.xml.bz2
+  args:
+    chdir: /tmp
+    creates: ubuntu.oval.xml
+
+- name: Scan vulnerabilities
+  ansible.builtin.shell: oscap oval eval --report vulnerabilities.html ubuntu.oval.xml
+  args:
+    chdir: /tmp
+    creates: vulnerabilities.html
+
+- name: Copy checklist
+  ansible.builtin.copy:
+    src: "ssg-ubuntu2004-ds-1.2.xml"
+    dest: "/tmp/ssg-ubuntu2004-ds-1.2.xml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Scan system
+  ansible.builtin.shell: oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis_level2_server --fetch-remote-resources --results-arf arf.xml --report report.html ssg-ubuntu2004-ds-1.2.xml
+  args:
+    chdir: /tmp
+    creates: report.html
+  ignore_errors: true
+
+- name: Creates openSCAP directory
+  delegate_to: localhost
+  become: false
+  file:
+    path: "reports/{{inventory_hostname}}/openscap"
+    state: directory
+
+- name: Get reports
+  ansible.builtin.fetch:
+    src: "/tmp/{{item}}"
+    dest: "reports/{{inventory_hostname}}/openscap/"
+    flat: true
+  with_items:
+    - vulnerabilities.html
+    - report.html
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "/tmp/{{item}}"
+    state: absent
+  with_items:
+    - vulnerabilities.html
+    - report.html
+    - ubuntu.oval.xml

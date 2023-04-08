@@ -1,0 +1,19 @@
+all:
+  hosts:
+  children:
+    servers:
+      hosts:
+        192.168.122.18:
+        192.168.122.31:
+
+    dvwa:
+      hosts:
+        192.168.122.18:
+
+    docker:
+      hosts:
+        192.168.122.31:
+
+  vars:
+    ansible_ssh_user: vagrant
+    ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key

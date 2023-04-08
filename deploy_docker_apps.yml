@@ -1,0 +1,75 @@
+---
+- name: Install apps using Docker
+  hosts: docker
+  become: true
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.package:
+        name:
+          - git
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+        update_cache: true
+
+    - name: Add Docker GPG apt Key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      ansible.builtin.apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      ansible.builtin.package:
+        name:
+          - docker-ce
+          - docker-compose
+        state: latest
+        update_cache: true
+
+    - name: Git checkout awesome-compose
+      ansible.builtin.git:
+        repo: "https://github.com/docker/awesome-compose.git"
+        dest: /opt/awesome-compose
+        version: e6b1d2755f2f72a363fc346e52dce10cace846c8
+
+    - name: Start services "gitea-postgres"
+      ansible.builtin.shell: docker compose up --no-color --quiet-pull  -d
+      args:
+        chdir: /opt/awesome-compose/gitea-postgres
+      register: output
+
+    - ansible.builtin.debug:
+        var: output
+
+    - name: Start services "elasticsearch-logstash-kibana"
+      ansible.builtin.shell: docker compose up --no-color --quiet-pull -d
+      args:
+        chdir: /opt/awesome-compose/elasticsearch-logstash-kibana
+      register: output
+
+    - ansible.builtin.debug:
+        var: output
+
+    - name: Replace bind port
+      ansible.builtin.replace:
+        path: /opt/awesome-compose/nextcloud-redis-mariadb/compose.yaml
+        regexp: "- 80:80"
+        replace: "- 8000:80"
+
+    - name: Start services "nextcloud-redis-mariadb"
+      ansible.builtin.shell: docker compose up --no-color --quiet-pull -d
+      args:
+        chdir: /opt/awesome-compose/nextcloud-redis-mariadb
+      register: output
+
+    - ansible.builtin.debug:
+        var: output

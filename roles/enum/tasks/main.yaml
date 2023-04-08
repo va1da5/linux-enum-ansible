@@ -1,0 +1,20 @@
+---
+- name: Create reports directories
+  delegate_to: localhost
+  become: false
+  file:
+    path: "reports/{{inventory_hostname}}"
+    state: directory
+
+# - name: Enumerate Linux hosts
+#   include_tasks: linux_enum.yml
+
+- name: Is Docker Present
+  command: which docker
+  register: docker
+  check_mode: false
+  changed_when: false
+
+- name: Enumerate Docker
+  include_tasks: docker.yml
+  when: not docker.failed

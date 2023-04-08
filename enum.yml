@@ -1,0 +1,27 @@
+---
+- hosts: all # targets all hosts
+  become: true
+  tasks:
+    - name: Include the enumeration role
+      include_role:
+        name: enum
+
+- hosts: dvwa
+  become: true
+  tasks:
+    - name: Calc hashes
+      vars:
+        dirs:
+          - /etc/cron*
+          - /var/www/html
+          - /etc/systemd
+        # grep: \.(php|js)$
+      include_role:
+        name: hash
+
+- hosts: all
+  become: true
+  tasks:
+    - name: OpenSCAP Analysis
+      include_role:
+        name: openscap

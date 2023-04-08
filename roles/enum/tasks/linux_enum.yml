@@ -1,0 +1,58 @@
+---
+- name: Copy Enum Scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/tmp/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  with_items:
+    - linpeas.sh
+    - lse.sh
+
+# https://github.com/carlospolop/PEASS-ng/tree/master/linPEAS
+- name: Enumerate Linux details - LinPeas
+  ansible.builtin.shell: ./linpeas.sh -e -q > linpeas.out
+  args:
+    chdir: /tmp
+    creates: linpeas.out
+
+# https://github.com/diego-treitos/linux-smart-enumeration
+- name: Enumerate Linux details - lse privileged
+  ansible.builtin.shell: ./lse.sh -i -l2 -s usr,sys,sec,ret,net,srv,pro,sof,ctn,cve > lse.out && chmod 666 lse.out
+  args:
+    chdir: /tmp
+# fst000 - too much output while root
+
+- name: Enumerate Linux details - lse regular user
+  become: false
+  ansible.builtin.shell: ./lse.sh -i -l2 -s sud,fst >> lse.out
+  args:
+    chdir: /tmp
+
+- name: Get report
+  ansible.builtin.fetch:
+    src: "/tmp/{{ item }}"
+    dest: "reports/{{inventory_hostname}}/"
+    flat: true
+  with_items:
+    - linpeas.out
+    - lse.out
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "/tmp/{{ item }}"
+    state: absent
+  with_items:
+    - linpeas.out
+    - lse.out
+    - linpeas.sh
+    - lse.sh
+
+- name: Convert to HTML
+  ansible.builtin.shell: "cat reports/{{inventory_hostname}}/{{item}} | ansi2html -s dracula > reports/{{inventory_hostname}}/{{item}}.html"
+  delegate_to: localhost
+  become: false
+  with_items:
+    - linpeas.out
+    - lse.out

@@ -1,0 +1,4 @@
+ansible==7.4.0
+ansi2html==1.8.0
+ansible-lint==6.14.4
+ansible-navigator==3.0.2

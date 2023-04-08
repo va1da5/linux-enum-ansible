@@ -1,0 +1,63 @@
+---
+# https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/security_hardening/scanning-the-system-for-configuration-compliance-and-vulnerabilities_security-hardening
+- name: Install openSCAP dependencies
+  ansible.builtin.package:
+    name:
+      - openscap-scanner
+      - scap-security-guide
+      - bzip2
+    update_cache: true
+
+# https://www.redhat.com/security/data/oval/v2/
+- name: Download AlmaLinux OVAL oval.xml
+  vars:
+    version: "{{ansible_distribution_major_version}}"
+  ansible.builtin.get_url:
+    url: https://security.almalinux.org/oval/org.almalinux.alsa-{{version}}.xml.bz2
+    dest: /tmp/rhel.oval.xml.bz2
+    mode: "0660"
+
+- name: bzip2 unarchive
+  ansible.builtin.shell: bzip2 --decompress /tmp/rhel.oval.xml.bz2
+  args:
+    chdir: /tmp
+    creates: rhel.oval.xml
+
+- name: scan vulnerabilities
+  ansible.builtin.shell: oscap oval eval --report vulnerabilities.html rhel.oval.xml
+  args:
+    chdir: /tmp
+    creates: vulnerabilities.html
+
+# Find profiles: oscap info /usr/share/xml/scap/ssg/content/ssg-almalinux9-ds.xml
+- name: scan system
+  ansible.builtin.shell: oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_anssi_bp28_enhanced --fetch-remote-resources --results-arf arf.xml --report report.html --verbose-log-file out.txt /usr/share/xml/scap/ssg/content/ssg-almalinux{{ansible_distribution_major_version}}-ds.xml
+  args:
+    chdir: /tmp
+    creates: report.html
+  ignore_errors: true
+
+- name: Creates openSCAP directory
+  delegate_to: localhost
+  become: false
+  file:
+    path: "reports/{{inventory_hostname}}/openscap"
+    state: directory
+
+- name: Get reports
+  ansible.builtin.fetch:
+    src: "/tmp/{{item}}"
+    dest: "reports/{{inventory_hostname}}/openscap/"
+    flat: true
+  with_items:
+    - vulnerabilities.html
+    - report.html
+
+- name: Remove files
+  ansible.builtin.file:
+    path: "/tmp/{{item}}"
+    state: absent
+  with_items:
+    - vulnerabilities.html
+    - report.html
+    - rhel.oval.xml

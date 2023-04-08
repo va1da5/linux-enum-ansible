@@ -1,0 +1,6 @@
+---
+- ansible.builtin.debug:
+    msg: "{{ansible_distribution}} {{ansible_distribution_major_version}} ({{ansible_os_family}} family)"
+
+- include_tasks: "{{ ansible_distribution }}.yml"
+  ignore_errors: true

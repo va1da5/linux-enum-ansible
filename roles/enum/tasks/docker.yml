@@ -1,0 +1,91 @@
+---
+# https://docs.ansible.com/ansible/latest/collections/community/docker/index.html#modules
+
+# https://gist.github.com/ictus4u/e28b47dc826644412629093d5c9185be
+- name: Copy Enum Scripts
+  ansible.builtin.copy:
+    src: "run.tpl"
+    dest: "/tmp/run.tpl"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Creates Docker reports directory
+  delegate_to: localhost
+  become: false
+  file:
+    path: "reports/{{inventory_hostname}}/docker"
+    state: directory
+
+- command: docker ps --format "{{ '{{' }} .Names {{ '}}' }}"
+  register: containers
+
+# - ansible.builtin.debug:
+#     var: "{{ item }}"
+#   with_items:
+#     - "{{ containers.stdout_lines }}"
+
+- name: Get infos on container
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  register: details
+  with_items:
+    - "{{ containers.stdout_lines }}"
+  when: not containers.failed
+
+# - ansible.builtin.debug:
+#     var: details
+
+- name: Save Container Details
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ details.results }}"
+    dest: "reports/{{inventory_hostname}}/docker/containers.json"
+  when: not containers.failed
+
+- name: "Get Docker Run command"
+  shell: docker inspect --format "$(cat /tmp/run.tpl)" "{{item}}"
+  register: docker_run
+  with_items:
+    - "{{ containers.stdout_lines }}"
+
+# - ansible.builtin.debug:
+#     var: docker_run
+
+- name: Save Container Run
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ docker_run.results[item.0].stdout}}" # _lines|join('\n')
+    dest: "reports/{{inventory_hostname}}/docker/container-run-{{item.1}}.sh"
+  with_indexed_items:
+    - "{{ containers.stdout_lines }}"
+#
+
+# docker image ls --format "{{ .Repository }}:{{ .Tag }}"
+- command: docker image ls --format "{{ '{{' }} .Repository {{ '}}' }}:{{ '{{' }} .Tag {{ '}}' }}"
+  register: images
+
+- name: Get image details
+  community.docker.docker_image_info:
+    name: "{{ item }}"
+  with_items:
+    - "{{ images.stdout_lines }}"
+  register: images_details
+  when: not images.failed
+
+- name: Save Container Details
+  delegate_to: localhost
+  become: false
+  copy:
+    content: "{{ images_details.results }}"
+    dest: "reports/{{inventory_hostname}}/docker/images.json"
+  when: not images.failed
+
+# https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_filters.html
+
+- name: Remove template
+  ansible.builtin.file:
+    path: "/tmp/run.tpl"
+    state: absent
